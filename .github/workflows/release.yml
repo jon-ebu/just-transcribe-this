@@ -43,7 +43,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+        run: cargo tauri --version || cargo install tauri-cli --version "^2" --locked
 
       - name: Build Tauri app
         run: cargo tauri build
