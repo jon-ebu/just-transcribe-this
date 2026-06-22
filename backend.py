@@ -10,6 +10,7 @@ from flask_cors import CORS
 from faster_whisper import WhisperModel
 from waitress import serve
 
+from diagnostics import MemoryMonitor, setup_crash_handler
 from version import __version__
 
 PORT = 5001
@@ -52,6 +53,10 @@ cfg = {"save_history": True, "model_size": "base"}
 
 app = Flask(__name__, static_folder=_bundle_path("static"), static_url_path="/")
 CORS(app)  # allow requests from Tauri's webview origin
+
+setup_crash_handler()
+_mem_monitor = MemoryMonitor(interval=30)
+_mem_monitor.start()
 
 log.info(f"Just Transcribe This v{__version__}")
 log.info("Loading Whisper model (base)...")
