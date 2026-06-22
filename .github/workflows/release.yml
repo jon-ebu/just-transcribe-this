@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies and PyInstaller
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build Python backend binary
+        run: pyinstaller backend.spec
+
+      - name: Stage backend binary for Tauri
+        run: |
+          mkdir -p src-tauri/binaries
+          cp dist/backend src-tauri/binaries/backend-aarch64-apple-darwin
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build Tauri app
+        run: cargo tauri build
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Just-Transcribe-This-macOS
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+      - name: Attach .dmg to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/dmg/*.dmg

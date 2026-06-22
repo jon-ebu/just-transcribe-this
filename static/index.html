@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Just Transcribe This</title>
+  <style>
+    :root {
+      --bg:       #ffffff;
+      --bg2:      #f0f0f0;
+      --text:     #000000;
+      --text2:    #444444;
+      --border:   #000000;
+      --border2:  #888888;
+      --btn-face: #d4d0c8;
+      --btn-hi:   #ffffff;
+      --btn-sh:   #808080;
+      --link:     #0000cc;
+    }
+
+    body.dark {
+      --bg:       #141414;
+      --bg2:      #1e1e1e;
+      --text:     #c8c8c8;
+      --text2:    #888888;
+      --border:   #666666;
+      --border2:  #444444;
+      --btn-face: #2a2a2a;
+      --btn-hi:   #555555;
+      --btn-sh:   #111111;
+      --link:     #8888ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 16px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 660px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+
+    a { color: var(--link); }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    h1 em {
+      font-style: normal;
+      text-decoration: underline;
+    }
+
+    .tagline {
+      font-size: 0.875rem;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 14px 0;
+    }
+
+    hr.thick {
+      border-top-width: 2px;
+    }
+
+    /* Info bubble */
+    #info-toggle {
+      font-family: "Courier New", monospace;
+      font-size: 0.78rem;
+      text-decoration: none;
+      color: var(--link);
+    }
+
+    #info-toggle:hover { text-decoration: underline; }
+
+    #info-popup {
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      padding: 10px 14px;
+      font-size: 0.875rem;
+      color: var(--text2);
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    #info-popup b { color: var(--text); }
+
+    /* Model details */
+    #model-details {
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      margin-bottom: 14px;
+      font-size: 0.875rem;
+    }
+
+    #model-details summary {
+      padding: 5px 10px;
+      cursor: pointer;
+      font-family: "Courier New", monospace;
+      font-size: 0.82rem;
+      color: var(--text2);
+      user-select: none;
+      list-style: none;
+    }
+
+    #model-details summary::-webkit-details-marker { display: none; }
+    #model-details summary::marker { display: none; }
+
+    #model-details summary:hover { color: var(--text); }
+
+    #model-details[open] summary {
+      border-bottom: 1px solid var(--border2);
+      color: var(--text);
+    }
+
+    #model-details[open] { padding-bottom: 6px; }
+
+    #model-loading {
+      font-style: italic;
+      font-size: 0.78rem;
+      color: var(--text2);
+      display: none;
+      padding: 0 10px 4px;
+    }
+
+    #model-table { border-collapse: collapse; width: 100%; }
+
+    #model-table td { padding: 3px 8px; vertical-align: top; }
+
+    #model-table td:first-child { width: 20px; padding-right: 2px; }
+
+    #model-table td:nth-child(2) {
+      font-family: "Courier New", monospace;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      padding-right: 10px;
+      font-weight: bold;
+      width: 58px;
+    }
+
+    #model-table td:last-child { color: var(--text2); font-size: 0.85rem; }
+
+    /* Native-style buttons */
+    button {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.875rem;
+      color: var(--text);
+      background: var(--btn-face);
+      border-top:    2px solid var(--btn-hi);
+      border-left:   2px solid var(--btn-hi);
+      border-bottom: 2px solid var(--btn-sh);
+      border-right:  2px solid var(--btn-sh);
+      padding: 2px 10px;
+      cursor: pointer;
+    }
+
+    button:active {
+      border-top:    2px solid var(--btn-sh);
+      border-left:   2px solid var(--btn-sh);
+      border-bottom: 2px solid var(--btn-hi);
+      border-right:  2px solid var(--btn-hi);
+    }
+
+    button.danger { color: #aa0000; }
+    body.dark button.danger { color: #ff6666; }
+
+    select {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.875rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      padding: 1px 4px;
+    }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 2px dashed var(--border2);
+      background: var(--bg2);
+      padding: 52px 24px;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+
+    #drop-zone.drag-over {
+      border-style: solid;
+      border-color: var(--border);
+      background: var(--bg);
+    }
+
+    #drop-zone p { color: var(--text2); font-size: 0.95rem; }
+    #drop-zone p b { color: var(--text); }
+    #drop-zone small {
+      font-size: 0.8rem;
+      font-family: "Courier New", monospace;
+      color: var(--text2);
+    }
+
+    #file-input { display: none; }
+
+    /* Status */
+    #status {
+      font-size: 0.875rem;
+      color: var(--text2);
+      min-height: 1.3em;
+      margin-bottom: 14px;
+      font-style: italic;
+    }
+
+    #status.done  { color: #006600; font-style: normal; font-weight: bold; }
+    body.dark #status.done { color: #44bb44; }
+    #status.error { color: #aa0000; font-style: normal; }
+    body.dark #status.error { color: #ff6666; }
+
+    /* Transcript box */
+    #transcript-box {
+      display: none;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 12px 14px;
+      margin-bottom: 18px;
+    }
+
+    .box-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .box-header b { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    #transcript-text {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* History */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .section-header h2 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .history-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.875rem;
+    }
+
+    .history-controls label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    #history-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .history-item {
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      padding: 10px 12px;
+    }
+
+    .fname {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.78rem;
+      color: var(--text2);
+      margin-bottom: 4px;
+    }
+
+    .preview {
+      font-size: 0.9rem;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .history-item.expanded .preview { display: none; }
+
+    .full-text {
+      display: none;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .history-item.expanded .full-text { display: block; }
+
+    .item-footer {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    #no-history { font-size: 0.9rem; color: var(--text2); font-style: italic; }
+
+    /* Tiny clock indicator */
+    #clock-mode {
+      font-size: 0.78rem;
+      color: var(--text2);
+      font-family: "Courier New", monospace;
+      float: right;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<span id="clock-mode"></span>
+<h1>Just <em>Transcribe</em> This</h1>
+<p class="tagline">
+  Local audio transcription &mdash; nothing leaves your machine.
+  &nbsp;<a href="#" id="info-toggle" onclick="toggleInfo(event)">[?]</a>
+</p>
+
+<div id="info-popup">
+  <b>About this app</b><br />
+  Powered by <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">OpenAI Whisper</a>
+  (faster-whisper), an open-source speech recognition system developed by OpenAI.
+  Runs entirely on your computer &mdash; no audio is ever sent to any external server or cloud service.
+  Transcripts are saved locally as <code>.txt</code> files in the <code>transcriptions/</code> folder.
+</div>
+
+<hr class="thick" />
+
+<div id="drop-zone">
+  <p><b>Drop an audio file here</b></p>
+  <p>or click to browse</p>
+  <br />
+  <small>mp3 &nbsp;&middot;&nbsp; wav &nbsp;&middot;&nbsp; m4a &nbsp;&middot;&nbsp; flac &nbsp;&middot;&nbsp; ogg</small>
+  <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" />
+</div>
+
+<details id="model-details">
+  <summary id="model-summary">Model: base &#9662;</summary>
+  <span id="model-loading">[loading&hellip;]</span>
+  <table id="model-table">
+    <tr>
+      <td><input type="radio" name="model" id="m-tiny"   value="tiny"   /></td>
+      <td><label for="m-tiny">tiny</label></td>
+      <td>Fastest. ~39M parameters. Good for short, clearly spoken audio in quiet settings. May miss words or mishear accents.</td>
+    </tr>
+    <tr>
+      <td><input type="radio" name="model" id="m-base"   value="base"   checked /></td>
+      <td><label for="m-base">base</label></td>
+      <td>Balanced speed and accuracy. Handles most everyday recordings well. A reasonable default for general use.</td>
+    </tr>
+    <tr>
+      <td><input type="radio" name="model" id="m-small"  value="small"  /></td>
+      <td><label for="m-small">small</label></td>
+      <td>Better accuracy for accented speech, interviews, and longer recordings. Roughly 2&ndash;3&times; slower than base.</td>
+    </tr>
+    <tr>
+      <td><input type="radio" name="model" id="m-medium" value="medium" /></td>
+      <td><label for="m-medium">medium</label></td>
+      <td>Best accuracy. Handles difficult audio, heavy accents, and technical vocabulary. Noticeably slower &mdash; good when quality matters most.</td>
+    </tr>
+  </table>
+</details>
+
+<div id="status"></div>
+
+<div id="transcript-box">
+  <div class="box-header">
+    <b>Transcript</b>
+    <button id="copy-btn">Copy to clipboard</button>
+  </div>
+  <div id="transcript-text"></div>
+</div>
+
+<hr />
+
+<div class="section-header">
+  <h2>History</h2>
+  <div class="history-controls">
+    <label>
+      <input type="checkbox" id="history-toggle" checked />
+      Save history
+    </label>
+    <button id="clear-btn" class="danger">Clear all</button>
+  </div>
+</div>
+
+<div id="history-list"><p id="no-history">No transcriptions yet.</p></div>
+
+<hr />
+<p style="font-size:0.78rem; color:var(--text2); font-family:'Courier New',monospace;">
+  just-transcribe-this &nbsp;&mdash;&nbsp; runs on localhost:5001
+</p>
+
+<script>
+  // Theme: light 6am–9pm, dark otherwise
+  const hour = new Date().getHours();
+  const isDark = hour < 6 || hour >= 21;
+  if (isDark) document.body.classList.add("dark");
+  document.getElementById("clock-mode").textContent =
+    isDark ? "[night mode]" : "[day mode]";
+
+  const dropZone      = document.getElementById("drop-zone");
+  const fileInput     = document.getElementById("file-input");
+  const statusEl      = document.getElementById("status");
+  const transcriptBox = document.getElementById("transcript-box");
+  const transcriptText= document.getElementById("transcript-text");
+  const copyBtn       = document.getElementById("copy-btn");
+  const historyList   = document.getElementById("history-list");
+  const historyToggle = document.getElementById("history-toggle");
+  const clearBtn      = document.getElementById("clear-btn");
+  const modelLoading  = document.getElementById("model-loading");
+  const modelRadios   = document.querySelectorAll("input[name='model']");
+
+  // Always use absolute URL so this works whether served by Flask or Tauri's webview
+  const BASE = "http://localhost:5001";
+
+  function savePref(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+  function loadPref(k, d) { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : d; }
+
+  function toggleInfo(e) {
+    e.preventDefault();
+    const popup = document.getElementById("info-popup");
+    popup.style.display = popup.style.display === "block" ? "none" : "block";
+  }
+
+  function applyHistoryEnabled(enabled) {
+    historyToggle.checked = enabled;
+    historyList.style.display = enabled ? "" : "none";
+    clearBtn.style.display = enabled ? "" : "none";
+    fetch(`${BASE}/config`, { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ save_history: enabled }) });
+  }
+
+  async function applyModelSize(size) {
+    modelRadios.forEach(r => { r.checked = (r.value === size); r.disabled = false; });
+    document.getElementById("model-summary").textContent = `Model: ${size} ▾`;
+    modelLoading.style.display = "";
+    modelRadios.forEach(r => r.disabled = true);
+    try {
+      await fetch(`${BASE}/config`, { method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ model_size: size }) });
+    } finally {
+      modelLoading.style.display = "none";
+      modelRadios.forEach(r => r.disabled = false);
+    }
+  }
+
+  // Restore prefs
+  const savedHistory = loadPref("historyEnabled", true);
+  const savedModel   = loadPref("modelSize", "base");
+  applyHistoryEnabled(savedHistory);
+  applyModelSize(savedModel);
+
+  historyToggle.addEventListener("change", () => {
+    const on = historyToggle.checked;
+    savePref("historyEnabled", on);
+    applyHistoryEnabled(on);
+    if (on) loadHistory();
+  });
+
+  modelRadios.forEach(r => r.addEventListener("change", () => {
+    savePref("modelSize", r.value);
+    applyModelSize(r.value);
+  }));
+
+  clearBtn.addEventListener("click", async () => {
+    if (!confirm("Delete all saved transcription files?")) return;
+    await fetch(`${BASE}/history`, { method: "DELETE" });
+    for (const k in historyStore) delete historyStore[k];
+    historyList.innerHTML = '<p id="no-history">No transcriptions yet.</p>';
+  });
+
+  // Drop zone
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  dropZone.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  copyBtn.addEventListener("click", () => copyText(transcriptText.textContent, copyBtn, "Copy to clipboard"));
+
+  function setStatus(msg, cls = "") {
+    statusEl.className = cls;
+    statusEl.textContent = msg;
+  }
+
+  async function handleFile(file) {
+    setStatus(`Uploading ${file.name}…`);
+    transcriptBox.style.display = "none";
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      setStatus("Transcribing… this may take a moment.");
+      const res  = await fetch(`${BASE}/transcribe`, { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Transcription failed");
+      transcriptText.textContent = data.text;
+      transcriptBox.style.display = "block";
+      setStatus("Done. Transcript copied to clipboard.", "done");
+      await copyText(data.text, copyBtn, "Copy to clipboard");
+      if (historyToggle.checked) loadHistory();
+    } catch (err) {
+      setStatus("Error: " + err.message, "error");
+    }
+  }
+
+  async function copyText(text, btn, resetLabel) {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (btn) {
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = resetLabel; }, 2000);
+      }
+    } catch { /* clipboard blocked */ }
+  }
+
+  // Keyed by filename so expand/copy can look up text without storing it in the DOM
+  const historyStore = {};
+  let historyOffset = 0;
+  const HISTORY_PAGE = 50;
+
+  async function loadHistory(reset = true) {
+    try {
+      if (reset) {
+        historyOffset = 0;
+        historyList.innerHTML = "";
+      }
+      const res  = await fetch(`${BASE}/history?limit=${HISTORY_PAGE}&offset=${historyOffset}`);
+      const data = await res.json();
+      const items = data.items ?? data; // compat if old backend
+      const total = data.total ?? items.length;
+
+      if (historyOffset === 0 && !items.length) {
+        historyList.innerHTML = '<p id="no-history">No transcriptions yet.</p>';
+        return;
+      }
+
+      const existing = document.getElementById("load-more-btn");
+      if (existing) existing.remove();
+
+      for (const item of items) {
+        historyStore[item.filename] = item.text;
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.dataset.filename = item.filename;
+        div.innerHTML = `
+          <div class="fname">${escHtml(item.filename)}</div>
+          <div class="preview">${escHtml(item.text)}</div>
+          <div class="full-text"></div>
+          <div class="item-footer">
+            <button onclick="toggleExpand(this.closest('.history-item'))">Show more</button>
+            <button onclick="copyHistoryItem(this)">Copy</button>
+          </div>`;
+        historyList.appendChild(div);
+      }
+
+      historyOffset += items.length;
+      if (historyOffset < total) {
+        const btn = document.createElement("button");
+        btn.id = "load-more-btn";
+        btn.textContent = `Load more (${total - historyOffset} remaining)`;
+        btn.style.marginTop = "8px";
+        btn.addEventListener("click", () => loadHistory(false));
+        historyList.appendChild(btn);
+      }
+    } catch { /* ignore */ }
+  }
+
+  function toggleExpand(el) {
+    const expanded = el.classList.toggle("expanded");
+    el.querySelector(".item-footer button").textContent = expanded ? "Show less" : "Show more";
+    if (expanded) {
+      const fullDiv = el.querySelector(".full-text");
+      if (!fullDiv.textContent) {
+        fullDiv.textContent = historyStore[el.dataset.filename] ?? "";
+      }
+    }
+  }
+
+  function copyHistoryItem(btn) {
+    const el   = btn.closest(".history-item");
+    const text = historyStore[el.dataset.filename] ?? "";
+    copyText(text, btn, "Copy");
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  if (savedHistory) loadHistory();
+</script>
+</body>
+</html>
