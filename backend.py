@@ -78,6 +78,11 @@ def index():
     return app.send_static_file("index.html")
 
 
+@app.route("/version")
+def get_version():
+    return jsonify({"version": __version__})
+
+
 @app.route("/config", methods=["GET"])
 def get_config():
     return jsonify(cfg)

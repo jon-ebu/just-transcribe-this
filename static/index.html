@@ -413,7 +413,7 @@
 
 <hr />
 <p style="font-size:0.78rem; color:var(--text2); font-family:'Courier New',monospace;">
-  just-transcribe-this &nbsp;&mdash;&nbsp; runs on localhost:5001
+  just-transcribe-this &nbsp;&mdash;&nbsp; v<span id="app-version">…</span>
 </p>
 
 <script>
@@ -438,6 +438,10 @@
 
   // Always use absolute URL so this works whether served by Flask or Tauri's webview
   const BASE = "http://localhost:5001";
+
+  fetch(`${BASE}/version`).then(r => r.json()).then(d => {
+    document.getElementById("app-version").textContent = d.version;
+  });
 
   function savePref(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
   function loadPref(k, d) { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : d; }
