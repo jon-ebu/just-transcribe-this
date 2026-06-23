@@ -322,14 +322,17 @@
 
     #no-history { font-size: 0.9rem; color: var(--text2); font-style: italic; }
 
-    /* Tiny clock indicator */
+    /* Theme toggle */
     #clock-mode {
       font-size: 0.78rem;
       color: var(--text2);
       font-family: "Courier New", monospace;
       float: right;
       margin-top: 6px;
+      cursor: pointer;
+      user-select: none;
     }
+    #clock-mode:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -412,61 +415,105 @@
 <div id="history-list"><p id="no-history">No transcriptions yet.</p></div>
 
 <hr />
-<p style="font-size:0.78rem; color:var(--text2); font-family:'Courier New',monospace;">
+<p style="font-size:0.78rem; color:var(--text2); font-family:'Courier New',monospace; white-space:nowrap;">
   just-transcribe-this &nbsp;&mdash;&nbsp; v<span id="app-version">…</span>
 </p>
 
 <script>
-  // Theme: light 6am–9pm, dark otherwise
-  const hour = new Date().getHours();
-  const isDark = hour < 6 || hour >= 21;
-  if (isDark) document.body.classList.add("dark");
-  document.getElementById("clock-mode").textContent =
-    isDark ? "[night mode]" : "[day mode]";
+  // ─── Theme ──────────────────────────────────────────────────────────────────
+  function applyTheme(dark) {
+    document.body.classList.toggle("dark", dark);
+    document.getElementById("clock-mode").textContent = dark ? "[night mode]" : "[day mode]";
+  }
 
-  const dropZone      = document.getElementById("drop-zone");
-  const fileInput     = document.getElementById("file-input");
-  const statusEl      = document.getElementById("status");
-  const transcriptBox = document.getElementById("transcript-box");
-  const transcriptText= document.getElementById("transcript-text");
-  const copyBtn       = document.getElementById("copy-btn");
-  const historyList   = document.getElementById("history-list");
-  const historyToggle = document.getElementById("history-toggle");
-  const clearBtn      = document.getElementById("clear-btn");
-  const modelLoading  = document.getElementById("model-loading");
-  const modelRadios   = document.querySelectorAll("input[name='model']");
+  const savedTheme = localStorage.getItem("theme");
+  const autoDark   = new Date().getHours() < 6 || new Date().getHours() >= 21;
+  let   currentDark = savedTheme !== null ? savedTheme === "dark" : autoDark;
+  applyTheme(currentDark);
 
-  // Always use absolute URL so this works whether served by Flask or Tauri's webview
-  const BASE = "http://localhost:5001";
-
-  fetch(`${BASE}/version`).then(r => r.json()).then(d => {
-    document.getElementById("app-version").textContent = d.version;
+  document.getElementById("clock-mode").addEventListener("click", () => {
+    currentDark = !currentDark;
+    localStorage.setItem("theme", currentDark ? "dark" : "light");
+    applyTheme(currentDark);
   });
+
+  // ─── Globals ─────────────────────────────────────────────────────────────────
+  let BASE = "http://localhost:5001";
+
+  const dropZone       = document.getElementById("drop-zone");
+  const fileInput      = document.getElementById("file-input");
+  const statusEl       = document.getElementById("status");
+  const transcriptBox  = document.getElementById("transcript-box");
+  const transcriptText = document.getElementById("transcript-text");
+  const copyBtn        = document.getElementById("copy-btn");
+  const historyList    = document.getElementById("history-list");
+  const historyToggle  = document.getElementById("history-toggle");
+  const clearBtn       = document.getElementById("clear-btn");
+  const modelLoading   = document.getElementById("model-loading");
+  const modelRadios    = document.querySelectorAll("input[name='model']");
 
   function savePref(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
   function loadPref(k, d) { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : d; }
 
+  function setStatus(msg, cls = "") { statusEl.className = cls; statusEl.textContent = msg; }
+
   function toggleInfo(e) {
     e.preventDefault();
-    const popup = document.getElementById("info-popup");
-    popup.style.display = popup.style.display === "block" ? "none" : "block";
+    const p = document.getElementById("info-popup");
+    p.style.display = p.style.display === "block" ? "none" : "block";
+  }
+
+  // ─── Backend discovery ───────────────────────────────────────────────────────
+  // Tries ports 5001–5009 with retries so the version always resolves and
+  // transcription works even if the backend landed on a non-default port.
+  async function discoverBackend() {
+    const ports = [5001,5002,5003,5004,5005,5006,5007,5008,5009];
+    for (let attempt = 0; attempt < 30; attempt++) {
+      for (const port of ports) {
+        try {
+          const res = await fetch(`http://localhost:${port}/version`,
+            { signal: AbortSignal.timeout(400) });
+          if (res.ok) {
+            const data = await res.json();
+            BASE = `http://localhost:${port}`;
+            document.getElementById("app-version").textContent = data.version;
+            return true;
+          }
+        } catch { /* keep trying */ }
+      }
+      if (attempt === 0) setStatus("Connecting to backend…");
+      await new Promise(r => setTimeout(r, 600));
+    }
+    setStatus("Backend not responding — try restarting the app.", "error");
+    return false;
+  }
+
+  // ─── UI helpers ──────────────────────────────────────────────────────────────
+  function applyHistoryUI(enabled) {
+    historyToggle.checked       = enabled;
+    historyList.style.display   = enabled ? "" : "none";
+    clearBtn.style.display      = enabled ? "" : "none";
+  }
+
+  function applyModelUI(size) {
+    modelRadios.forEach(r => { r.checked = (r.value === size); });
+    document.getElementById("model-summary").textContent = `Model: ${size} ▾`;
   }
 
   function applyHistoryEnabled(enabled) {
-    historyToggle.checked = enabled;
-    historyList.style.display = enabled ? "" : "none";
-    clearBtn.style.display = enabled ? "" : "none";
-    fetch(`${BASE}/config`, { method: "POST", headers: {"Content-Type":"application/json"},
+    applyHistoryUI(enabled);
+    fetch(`${BASE}/config`, { method: "POST",
+      headers: {"Content-Type":"application/json"},
       body: JSON.stringify({ save_history: enabled }) });
   }
 
   async function applyModelSize(size) {
-    modelRadios.forEach(r => { r.checked = (r.value === size); r.disabled = false; });
-    document.getElementById("model-summary").textContent = `Model: ${size} ▾`;
+    applyModelUI(size);
     modelLoading.style.display = "";
     modelRadios.forEach(r => r.disabled = true);
     try {
-      await fetch(`${BASE}/config`, { method: "POST", headers: {"Content-Type":"application/json"},
+      await fetch(`${BASE}/config`, { method: "POST",
+        headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ model_size: size }) });
     } finally {
       modelLoading.style.display = "none";
@@ -474,11 +521,11 @@
     }
   }
 
-  // Restore prefs
+  // ─── Restore prefs & wire events (UI-only, no backend needed yet) ─────────────
   const savedHistory = loadPref("historyEnabled", true);
   const savedModel   = loadPref("modelSize", "base");
-  applyHistoryEnabled(savedHistory);
-  applyModelSize(savedModel);
+  applyHistoryUI(savedHistory);
+  applyModelUI(savedModel);
 
   historyToggle.addEventListener("change", () => {
     const on = historyToggle.checked;
@@ -499,8 +546,7 @@
     historyList.innerHTML = '<p id="no-history">No transcriptions yet.</p>';
   });
 
-  // Drop zone
-  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
   dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
   dropZone.addEventListener("drop", e => {
     e.preventDefault();
@@ -510,14 +556,17 @@
   });
   dropZone.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
-
   copyBtn.addEventListener("click", () => copyText(transcriptText.textContent, copyBtn, "Copy to clipboard"));
 
-  function setStatus(msg, cls = "") {
-    statusEl.className = cls;
-    statusEl.textContent = msg;
-  }
+  // ─── Connect to backend, then finish init ────────────────────────────────────
+  discoverBackend().then(ok => {
+    if (!ok) return;
+    applyHistoryEnabled(savedHistory);
+    applyModelSize(savedModel);
+    if (savedHistory) loadHistory();
+  });
 
+  // ─── File handling ───────────────────────────────────────────────────────────
   async function handleFile(file) {
     setStatus(`Uploading ${file.name}…`);
     transcriptBox.style.display = "none";
@@ -541,27 +590,21 @@
   async function copyText(text, btn, resetLabel) {
     try {
       await navigator.clipboard.writeText(text);
-      if (btn) {
-        btn.textContent = "Copied!";
-        setTimeout(() => { btn.textContent = resetLabel; }, 2000);
-      }
+      if (btn) { btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = resetLabel; }, 2000); }
     } catch { /* clipboard blocked */ }
   }
 
-  // Keyed by filename so expand/copy can look up text without storing it in the DOM
+  // ─── History ─────────────────────────────────────────────────────────────────
   const historyStore = {};
-  let historyOffset = 0;
-  const HISTORY_PAGE = 50;
+  let   historyOffset = 0;
+  const HISTORY_PAGE  = 50;
 
   async function loadHistory(reset = true) {
     try {
-      if (reset) {
-        historyOffset = 0;
-        historyList.innerHTML = "";
-      }
-      const res  = await fetch(`${BASE}/history?limit=${HISTORY_PAGE}&offset=${historyOffset}`);
-      const data = await res.json();
-      const items = data.items ?? data; // compat if old backend
+      if (reset) { historyOffset = 0; historyList.innerHTML = ""; }
+      const res   = await fetch(`${BASE}/history?limit=${HISTORY_PAGE}&offset=${historyOffset}`);
+      const data  = await res.json();
+      const items = data.items ?? data;
       const total = data.total ?? items.length;
 
       if (historyOffset === 0 && !items.length) {
@@ -605,23 +648,17 @@
     el.querySelector(".item-footer button").textContent = expanded ? "Show less" : "Show more";
     if (expanded) {
       const fullDiv = el.querySelector(".full-text");
-      if (!fullDiv.textContent) {
-        fullDiv.textContent = historyStore[el.dataset.filename] ?? "";
-      }
+      if (!fullDiv.textContent) fullDiv.textContent = historyStore[el.dataset.filename] ?? "";
     }
   }
 
   function copyHistoryItem(btn) {
-    const el   = btn.closest(".history-item");
-    const text = historyStore[el.dataset.filename] ?? "";
-    copyText(text, btn, "Copy");
+    copyText(historyStore[btn.closest(".history-item").dataset.filename] ?? "", btn, "Copy");
   }
 
   function escHtml(s) {
     return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
-
-  if (savedHistory) loadHistory();
 </script>
 </body>
 </html>

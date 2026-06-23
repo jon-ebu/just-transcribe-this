@@ -1,7 +1,11 @@
+import atexit
 import gc
 import logging
 import os
+import signal
+import socket
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -13,7 +17,8 @@ from waitress import serve
 from diagnostics import MemoryMonitor, setup_crash_handler
 from version import __version__
 
-PORT = 5001
+PORT_START = 5001
+PORT_RANGE = 9  # try 5001–5009
 
 def _log_path():
     if getattr(sys, "frozen", False):
@@ -44,6 +49,39 @@ def _data_path(rel):
     else:
         base = os.path.dirname(os.path.abspath(__file__))
     return Path(base) / rel
+
+def _find_port() -> int:
+    for port in range(PORT_START, PORT_START + PORT_RANGE):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("127.0.0.1", port))
+                return port
+            except OSError:
+                continue
+    raise OSError(f"All ports {PORT_START}–{PORT_START + PORT_RANGE - 1} are in use")
+
+
+def _claim_singleton() -> None:
+    """Kill any previous backend instance and write our PID, preventing port collisions."""
+    pid_file = _data_path("backend.pid")
+    if pid_file.exists():
+        try:
+            old_pid = int(pid_file.read_text().strip())
+            if old_pid != os.getpid():
+                os.kill(old_pid, signal.SIGTERM)
+                log.info(f"Sent SIGTERM to stale backend PID {old_pid}")
+                time.sleep(0.5)
+                try:
+                    os.kill(old_pid, 0)  # still alive?
+                    os.kill(old_pid, signal.SIGKILL)
+                    time.sleep(0.3)
+                except ProcessLookupError:
+                    pass
+        except (ValueError, ProcessLookupError, OSError):
+            pass
+    pid_file.write_text(str(os.getpid()))
+    atexit.register(lambda: pid_file.unlink(missing_ok=True))
+
 
 TRANSCRIPTIONS_DIR = _data_path("transcriptions")
 TRANSCRIPTIONS_DIR.mkdir(exist_ok=True)
@@ -149,4 +187,8 @@ def clear_history():
 
 
 if __name__ == "__main__":
-    serve(app, host="127.0.0.1", port=PORT)
+    _claim_singleton()
+    port = _find_port()
+    if port != PORT_START:
+        log.warning(f"Port {PORT_START} still in use after cleanup; binding {port} instead")
+    serve(app, host="127.0.0.1", port=port)
